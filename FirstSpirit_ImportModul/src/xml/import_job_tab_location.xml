@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<job>
+	<name>DatenImport in Tabelle location</name>
+	<source-url>C:\data.csv</source-url>
+	<dbs>google_maps_dbs</dbs>
+	<table>location</table>
+</job>
