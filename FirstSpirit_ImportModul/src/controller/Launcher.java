@@ -76,7 +76,7 @@ import de.espirit.or.schema.Entity;
 
 public class Launcher extends JFrame
 {
-	//Import File Path -->> HIER VON DER ARBEIT
+	//Import File Path -->> HIER VON DER ARBEIT und jetzt von Zuhause
 	private static String _path = "";
 	//Connect
 	private static Connection _connection;
