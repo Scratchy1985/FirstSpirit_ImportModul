@@ -76,7 +76,7 @@ import de.espirit.or.schema.Entity;
 
 public class Launcher extends JFrame
 {
-	//Import File Path
+	//Import File Path -->> HIER HABE ICH AUF DEM PC SCRATCHY WAS HINZUGEFÜGT
 	private static String _path = "";
 	//Connect
 	private static Connection _connection;
