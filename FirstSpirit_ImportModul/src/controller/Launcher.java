@@ -14,6 +14,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Scanner;
+import java.util.Set;
 
 import javax.swing.JComponent;
 import javax.swing.JFrame;
@@ -64,6 +66,7 @@ import de.espirit.firstspirit.access.store.templatestore.Schema;
 import de.espirit.firstspirit.agency.SpecialistsBroker;
 import de.espirit.firstspirit.agency.StoreAgent;
 import de.espirit.firstspirit.client.migration.parser.Content;
+import de.espirit.firstspirit.common.GlobalSystemInformations.SysinfoShellResult;
 import de.espirit.firstspirit.common.IOError;
 import de.espirit.firstspirit.common.MaximumNumberOfSessionsExceededException;
 import de.espirit.firstspirit.forms.FormField;
@@ -74,131 +77,228 @@ import de.espirit.or.schema.Entity;
 
 
 
-public class Launcher extends JFrame
+public class Launcher  
 {
-	//Import File Path -->> HIER VON DER ARBEIT und jetzt von Zuhause
-	private static String _path = "";
+	//InputStream --> FÄLLT NACH GUI WEG
+	private static String _eingabe = "";
+	private static Scanner scanner = new Scanner(System.in);
+	private static String _jobWahl = "";
 	//Connect
 	private static Connection _connection;
 	//Project
 	private static Project _project;
 	//Store
 	private static Store _store;
-	private static Content2 _content2;
-	private static Schema _schema;
-	private static Session _session;
-	private static Map<Integer, String[]> _newData = new HashMap<Integer,String[]>();
-	//Import in DB/Tabellen
-	private static List<String> _refTable = new ArrayList<String>();
+	//Mapping
+	private static Map<String,String> _mapping= new HashMap<String,String>();
 	
 	
+	//****************************************************************************************************************************
+	//***MAIN*********************************************************************************************************************
+	//****************************************************************************************************************************
 	public static void main(String[] args) 
 	{
-		//Login FirstSpirit Server <-- FÄLLT WEG
+		//Login FirstSpirit Server 
 		connect("localhost",8000,1,"Admin","Admin");
-		_project = getProject("Test");
+		//Wahl des Projekts
+		_project = getProject("ImportProjekt");
 		
-		//Abfrage welche Import-Jobs in der Konfiguration erlaubt wurden --> GUI mit DropDown Menü zum Auswahl des Import-Jobs
-			//Start GUI -> Logo Nionex und FirstSpirit + Überschrift
+		System.out.println("Verbindung zum Projekt "+_project.getName()+" hergestellt...");
+		System.out.println();
 		
+		//Ausgabe möglicher Jobs
+		System.out.println("Mögliche Jobs:");
+		System.out.println("******************");
+		System.out.println("1  Daten-Import");
+		System.out.println("2  Seiten-Import");
 		
+		//InputStream Jobwahl
+		_jobWahl = inputStreamJob();
 		
-		//*************************************************************************************************************************
-		//DB Import gewählt
-		//*************************************************************************************************************************
+		//Check der Jobwahl 
+		if (_jobWahl.equals("1")) //--> Daten-Import 
+		{
+			System.out.println();
+			//Store erstellen
+			_store = _project.getUserService().getStore(Store.Type.CONTENTSTORE, false);
+			DatenImport di = new DatenImport(_store);
+			di.getAllTables();
+			di.printTab();
+			
+			//Eingabe der Ziel Tabelle
+			inputStreamTable(di);
+			
+			//ImportDatei --> Ermittlung der Daten und Ausgabe
+			CSVData csv_file = new CSVData("C:/data.csv",";");
+			csv_file.print();
+			
+			//Mapping Spalten in Tabelle --> Felder in CSV
+			System.out.println();
+			System.out.println("Mapping Tabelle/CSV-Datei:");
+			System.out.println("***************************");
+			inputStreamMapping(di,csv_file);
+		}
 		
-		
+		//Close Connection
 		try 
 		{
-			//XML Datei
-	        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-	        
-	        // Leerzeichen werden entfernt
-	        factory.setIgnoringElementContentWhitespace(true);
-
-	        // bevor ein 'Document' erstellt werden kann wird ein 'DocumentBuilder' benötigt
-	        DocumentBuilder builder= factory.newDocumentBuilder();
-	        
-			// Speicherort der XML-Datei
-	        File file = new File("src/xml/import_job_tab_location.xml");
-	        Document document = builder.parse(file);
-	        
-	        
-			String st_job_name = document.getDocumentElement().getElementsByTagName("name").item(0).getTextContent().trim();
-			String st_source = document.getDocumentElement().getElementsByTagName("source-url").item(0).getTextContent().trim();
-	        String st_dbs = document.getDocumentElement().getElementsByTagName("dbs").item(0).getTextContent().trim();
-	        String st_table = document.getDocumentElement().getElementsByTagName("table").item(0).getTextContent().trim();
-	        
-	        //Get Table of DBS
-	        Content2 _content2Country = (Content2) _store.getStoreElement(st_table, IDProvider.UidType.CONTENTSTORE);
-	        Schema _schemaCountry = _content2Country.getSchema();
-			Session _sessionCountry = _schemaCountry.getSession();
-	    	
-			//Select all from Table
-			Select select_all = _sessionCountry.createSelect(st_table);
-			List<Entity> _list = _sessionCountry.executeQuery(select_all);
-			
-			//Print all Entries from table
-			System.out.println("Spalten in location");
-			System.out.println("*****************************************");
-			
-			String allEntriesCountry = "";
-			for (Entity e : _list)
-			{
-				Collection<String> col_allAttNames = e.getAttributeNames();
-				for (String at : col_allAttNames)
-				{				
-					//Von FirstSpirit automatisch generierte Spalten --> Fehler bei getClass() --> daher die Abfrage an dieser Stelle
-					if (!at.toString().contains("released by") && !at.toString().contains("fs_id") && !at.toString().contains("wf col") && !at.toString().contains("wf id") && !at.toString().contains("changed by"))
-					{
-						//Check ob eine Referenz auf eine andere Tabelle vorliegt
-						if (e.getValue(at).getClass().toString().contains("de.espirit."))
-						{
-							String column = at.toString();
-							Entity en = (Entity) e.getValue(at);
-							for (String att : en.getAttributeNames())
-							{
-								if (att.equals(column))
-								{
-									System.out.println(en +"            Das ist eine Referenz auf eine Weiter Tabelle! Bitte erst alle zu importierenden Daten in diese Tabelle importieren.");
-									//Hier evtl. eine Liste füllen, die alle Referenztabellen enthält. Diese Werden dann hintereinander ausgegeben
-								}
-							}
-						}
-						else
-						{
-							System.out.println(at);
-						}
-					}
-					
-				}
-				break;
-			}
-	        
-	        
-		} 
-		catch (ParserConfigurationException e) 
-		{
-			e.printStackTrace();
-		} 
-		catch (SAXException e) 
-		{
-			e.printStackTrace();
+			_connection.close();
+			System.out.println();
+			System.out.println("Verbindung zum Server wurde getrennt.");
 		} 
 		catch (IOException e) 
 		{
 			e.printStackTrace();
 		}
-
-        
-
+	}
+	//****************************************************************************************************************************
+	//***MAIN ENDE****************************************************************************************************************
+	//****************************************************************************************************************************
+	
+	//InputStreamMapping 
+	public static void inputStreamMapping(DatenImport di, CSVData csv_file)
+	{
+		List<String> columnListCSV = csv_file.getColumnList();
 		
+		boolean error = false;
+		while (true)
+		{
+			for (String column : di.getColumns())
+			{
+				boolean check = false;
+				while (check == false)
+				{
+					System.out.println();
+					System.out.println("Mapping für Spalte "+column+ " festlegen:");
+					_eingabe = scanner.nextLine();
+					if (columnListCSV.contains(_eingabe))
+					{
+						_mapping.put(column, _eingabe);
+						check=true;
+					}
+				}
+			}
+			break;
+		}
 		
-    	//*************************************************************************************************************************
-    	//*************************************************************************************************************************
+		//Ausgabe des Mappings
+		System.out.println();
+		System.out.println();
+		System.out.println("Folgendes Mapping wurde festgelegt:");
+		System.out.println("************************************");
+		
+		for (String column : di.getColumns())
+		{
+			System.out.printf("%-30s %-30s", column, _mapping.get(column));
+			System.out.println();
+		}
+		
+		//Prüfen ob Import gestartet werden soll
+		System.out.println();
+		System.out.println();
+		System.out.println();
+		while (!_eingabe.equals("ja") && !_eingabe.equals("nein"))
+		{
+			System.out.println("Wollen Sie den Import Starten (ja/nein)?");
+			_eingabe = scanner.nextLine();
+		}
+		
+		//Check ja oder nein
+		if (_eingabe.equals("ja"))
+		{
+			System.out.println("Import wird gestartet....");
+		}
+		else
+		{
+			
+		}
+		
 	}
 	
-	//Fällt komplett ab hier weg, da die Verbindung als Modul schon vorhanden ist
+	//InputStreamJob
+	public static String inputStreamJob()
+	{
+		String job = "";
+		boolean error = false;
+		while (true)
+		{
+			if (error == false)
+			{
+				System.out.println();
+				System.out.println("Bitte Import-Job-Nr. eingeben: ");
+			}
+			else
+			{
+				System.out.println("Fehler! Bitte Job-Nr. nochmals eingeben: ");
+			}
+			
+			_eingabe = scanner.nextLine();
+			System.out.println();
+			
+			if (_eingabe.equals("1")) 
+			{
+				job = "1";
+				break;
+			}
+			else if (_eingabe.equals("2"))
+			{
+				System.out.println("Fehler: Noch nicht verfügbar.");
+				error = true;
+			}
+			else if (_eingabe.equals("exit") || _eingabe.equals("Exit"))
+			{
+				break;
+			}
+			else
+			{
+				error = true;
+			}
+		}
+		return job;
+	}
+	
+	
+	//ImputStreamTable
+	public static void inputStreamTable(DatenImport di)
+	{
+		boolean error = false;
+		while (true)
+		{
+			if (error == false)
+			{
+				System.out.println("Bitte Ziel Tabellennamen zum Import eingeben: ");
+			}
+			else
+			{
+				System.out.println("Fehler! Bitte Tabellenname nochmals eingeben: ");
+			}
+			
+			_eingabe = scanner.nextLine();
+			System.out.println();
+			
+			if (_store.getStoreElement(_eingabe, IDProvider.UidType.CONTENTSTORE) != null && !_store.getStoreElement(_eingabe, IDProvider.UidType.CONTENTSTORE).getName().contains("de.espirit.")) 
+			{
+				System.out.println();
+				//Schema + Session erstellen
+				di.fillColumList(_eingabe);
+				di.printContent(_eingabe);
+				break;
+			}
+			else if (_eingabe.equals("exit") || _eingabe.equals("Exit"))
+			{
+				break;
+			}
+			else
+			{
+				error = true;
+			}
+
+		}
+	}
+	
+	//************************************************************************************************
+	//CONNECTION --> FÄLLT WEG BEI GUI
+	//************************************************************************************************
 	//Connect
 	public static void connect (String host, int port, int mode, String user, String password)
 	{
@@ -247,56 +347,12 @@ public class Launcher extends JFrame
 			e1.printStackTrace();
 		}
 	}
+	//************************************************************************************************
+	//************************************************************************************************
 	
-	
-	//**************************************************************************************************************
-	//Connection / Project / getData / import Data / print
-	//**************************************************************************************************************
-		
 	//getProject
 	public static Project getProject (String projectName)
 	{
 		return Launcher.getConnection().getProjectByName(projectName);
-	}
-		
-	//getImportData
-	public static boolean getImportData (String filePath, String trennzeichen)
-	{
-		try 
-		{
-			BufferedReader br_data = new BufferedReader(new InputStreamReader(new FileInputStream(filePath)));
-			String line="";
-			int i = 0;
-			while ((line = br_data.readLine()) != null)
-			{
-				if (!line.isEmpty())
-				{
-					String [] location = line.split(trennzeichen);
-					_newData.put(i, location);
-					i++;
-				}
-				else
-				{
-					break;
-				}
-			}
-				
-			return true;
-		} 
-		catch (UnsupportedEncodingException e) 
-		{
-			e.printStackTrace();
-			return false;
-		} 
-		catch (FileNotFoundException e) 
-		{
-			e.printStackTrace();
-			return false;
-		} 
-		catch (IOException e) 
-		{
-			e.printStackTrace();
-			return false;
-		}
 	}
 }
