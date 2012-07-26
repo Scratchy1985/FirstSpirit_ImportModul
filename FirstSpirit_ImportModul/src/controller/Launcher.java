@@ -79,7 +79,7 @@ import de.espirit.or.schema.Entity;
 
 public class Launcher  
 {
-	//InputStream --> FÄLLT NACH GUI WEG
+	//InputStream --> FÄLLT NACH GUI WEG --> Hahahahhhahahah
 	private static String _eingabe = "";
 	private static Scanner scanner = new Scanner(System.in);
 	private static String _jobWahl = "";
