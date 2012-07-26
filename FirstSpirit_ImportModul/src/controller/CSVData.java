@@ -16,7 +16,7 @@ import de.espirit.or.schema.Entity;
 public class CSVData 
 {
 	//************************************************************************************************
-	//VARIABLEN TESTTTTTTTTT
+	//VARIABLEN 
 	//************************************************************************************************
 	private String path="";
 	private String cutter;
